@@ -1,5 +1,5 @@
 ## now  then match to gene names in stages
-unmachR <-function(ids,del_data,hgnc.table){
+unimachR <-function(ids,del_data,hgnc.table){
   ## function that takes a character vector of uniprot ids (ids=ids)
   ## and a data table of uniprot deleted IDs (del_data=del_data) # downloaded June 2021 https://www.uniprot.org/help/deleted_accessions, can download from here https://1drv.ms/u/s!Ah6q8jTg5ESfhItxgCSmwScj4lO9vw?e=35QFiM
   ## and a table of hgnc compliant gene mappings (hgnc.table) # # downloaded April 2022 https://github.com/waldronlab/HGNChelper/blob/master/data/hgnc.table.rda, can download use table from dowens github
