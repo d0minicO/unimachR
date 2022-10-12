@@ -96,7 +96,7 @@ unimachR <-function(ids,del_data,hgnc.table){
   cat("Done!\n")
   
   # set keys to help join faster
-  setkey(del_accs, "ID")
+  setkey(del_accs, "id")
   
   # make the ids table into a data table to allow quick join to the deleted IDs
   missed_ids %<>% data.table()
