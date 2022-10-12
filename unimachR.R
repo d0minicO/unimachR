@@ -5,8 +5,15 @@ unimachR <-function(ids,del_data,hgnc.table){
   ## and a table of hgnc compliant gene mappings (hgnc.table) # # downloaded April 2022 https://github.com/waldronlab/HGNChelper/blob/master/data/hgnc.table.rda, can download use table from dowens github
   
   
-  ## and will return a df with each uniprot ID as a row with a matched HGNC-compliant gene symbol
+  ## and will return a list containing three df elements
+  ## [[1]] a df with each uniprot ID as a row with a matched HGNC-compliant gene symbol
   ## columns are 1) hgnc_symbol 2) uniprot_id
+  ## use this df for later matching uniprot IDs to gene symbols
+  
+  
+  ## [[2]] a df containing all the uniprot IDs that match to more than one gene symbol
+  
+  ## [[3]] a df containing all the gene symbols that match to more than one uniprot ID
   
   require(tidyverse)
   require(magrittr)
@@ -142,18 +149,46 @@ unimachR <-function(ids,del_data,hgnc.table){
   
   cat("scraping done for",nrow(mapped_ids),"ids\n")
   
+  ## remove any that have no gene name on uniprot
+  mapped_ids %<>%
+    filter(!is.na(hgnc_symbol))
+  
+  
   ## combine the scraped ids and biomart matched ids
   colnames(mapped_ids) = colnames(mapping)
   mapping_out = rbind.data.frame(mapping,mapped_ids)
   
   ## report total mapping stats
-  total_mapped = nrow(mapping_out)
+  total_mapped = length(unique(mapping_out$uniprot_id))
+  total_genes = length(unique(mapping_out$hgnc_symbol))
   total_in = length(ids)
   
-  perc_matched = round(total_mapped*100/total_in)
+  perc_matched = signif(total_mapped*100/total_in,4)
   
-  cat("unimachR mapped",total_mapped,"ids (",perc_matched,"%)")
+  cat("unimachR mapped",total_mapped,"ids out of",total_in,"(",perc_matched,"%)\n")
+  cat(total_mapped,"ids mapped to",total_genes,"HGNC symbols\n")
   
-  return(mapping_out)
+  
+  ## find the uniprot IDs that map to more than one gene name
+  multi_ids =
+    mapping_out %>%
+    group_by(uniprot_id) %>%
+    summarise(count=n()) %>%
+    filter(count >1) %>%
+    arrange(desc(count))
+  
+  multi_genes =
+    mapping_out %>%
+    group_by(hgnc_symbol) %>%
+    summarise(count=n()) %>%
+    filter(count >1) %>%
+    arrange(desc(count))
+  
+  ## compose a list as output
+  mapping_out_list =
+    list(mapping_out,multi_ids,multi_genes)
+  
+  
+  return(mapping_out_list)
   
 }
