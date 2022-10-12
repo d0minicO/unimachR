@@ -151,7 +151,7 @@ unimachR <-function(ids,del_data,hgnc.table){
   
   ## remove any that have no gene name on uniprot
   mapped_ids %<>%
-    filter(!is.na(hgnc_symbol))
+    filter(!is.na(name))
   
   
   ## combine the scraped ids and biomart matched ids
