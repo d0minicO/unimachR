@@ -63,7 +63,7 @@ unimachR <-function(ids,del_data,hgnc.table){
   mapping %<>%
     filter(!is.na(hgnc_symbol))
   
-  ## quantify how many proteins were matched vs not matched
+  ## quantify how many ids were matched vs not matched
   matched = length(ids[ids %in% mapping$uniprot_id])
   no_matched = length(ids[ids %notin% mapping$uniprot_id])
   total = length(ids)
@@ -120,8 +120,8 @@ unimachR <-function(ids,del_data,hgnc.table){
     id = ids_toScrape[i]
     
     # report progress
-    a = signif(i/length(ids_toScrape),2)
-    cat(id,a,"\n")
+    a = signif(i*100/length(ids_toScrape),2)
+    cat(id,a,"% \n")
     ## error here is likely caused by deleted ID
     acc_url = paste0("https://www.uniprot.org/uniprot/",id,".fasta")
     
