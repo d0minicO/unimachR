@@ -29,16 +29,16 @@ unimachR <-function(ids,del_data,hgnc.table){
   
   ##### matching stage 1 #####
   ## batch match using biomart
-  cat("##### matching stage 1 #####\n")
+  cat("\n\n\n##### matching stage 1 #####\n")
   cat("batch match using biomart\n")
   
   
   # load the biomart object to allow retreiving uniprot IDs from ENS IDs
-  cat("loading the mart from biomart, takes some time...\n")
+  cat("\nloading the mart from biomart, takes some time...\n")
   hsmart <- useMart(dataset = "hsapiens_gene_ensembl", biomart = "ensembl")
   cat("Done!\n")
   
-  cat("Submitting batch query to biomart\n")
+  cat("\nSubmitting batch query to biomart\n")
   # use biomart to match gene symbols ENSEMBL IDs to Uniprot
   mapping <- getBM(
     attributes =c('hgnc_symbol','uniprotswissprot'),
@@ -77,8 +77,8 @@ unimachR <-function(ids,del_data,hgnc.table){
   perc_matched = round(matched*100/total)
   perc_nomatched = round(no_matched*100/total)
   
-  cat("Biomart found",matched,"ids (",perc_matched,"%)\n")
-  cat("Could not map ",no_matched,"ids (",perc_nomatched,"%)\n")
+  cat("\nBiomart found",matched,"ids (",perc_matched,"%)\n")
+  cat("\nCould not map ",no_matched,"ids (",perc_nomatched,"%)\n")
   
   
   
@@ -92,36 +92,36 @@ unimachR <-function(ids,del_data,hgnc.table){
     
     ##### matching stage 2 #####
     ## scraping uniprot webserver
-    cat("##### matching stage 2 #####\n")
-    cat("searching for deleted uniprot ids\n")
+    cat("\n\n\n##### matching stage 2 #####\n")
+    #cat("\nsearching for deleted uniprot ids\n")
     
     
     ## have XX uniprot IDs not mapped to genes, attemp to look these up on uniprot web and recover gene name
     missed_ids = ids[ids %notin% mapping$uniprot_id]
     
-    ## first need to clean them up to remove uniprot deleted IDs otherwise the loop no bueno
-    cat("loading deleted huge deleted IDs table, takes some time...\n")
-    del_accs = readRDS(del_data)
-    cat("Done!\n")
+    ## optional to clean them up to remove uniprot deleted IDs otherwise the loop no bueno
+    #cat("loading deleted huge deleted IDs table, takes some time...\n")
+    #del_accs = readRDS(del_data)
+    #cat("Done!\n")
     
     # set keys to help join faster
-    setkey(del_accs, "id")
+    #setkey(del_accs, "id")
     
     # make the ids table into a data table to allow quick join to the deleted IDs
-    missed_ids %<>% data.table()
+    #missed_ids %<>% data.table()
     
     colnames(missed_ids) = "uniprot_id"
     
     # set the key
-    setkey(missed_ids,"uniprot_id")
+    #setkey(missed_ids,"uniprot_id")
     
-    deleted = makeChar(missed_ids[del_accs, nomatch = 0])
+    #deleted = makeChar(missed_ids[del_accs, nomatch = 0])
     
-    cat("found",length(deleted),"deleted uniprot ID, removing\n")
+    #cat("found",length(deleted),"deleted uniprot ID, removing\n")
     
     # remove any deleted IDs
-    missed_ids %<>% 
-      filter(uniprot_id %notin% deleted)
+    #missed_ids %<>% 
+    #  filter(uniprot_id %notin% deleted)
     
     
     ids_toScrape = makeChar(missed_ids$uniprot_id)
@@ -132,6 +132,8 @@ unimachR <-function(ids,del_data,hgnc.table){
     mapped_ids = tibble()
     for(i in 1:length(ids_toScrape)){
       
+      # reset temp to null
+      temp=NULL
       
       id = ids_toScrape[i]
       
@@ -142,17 +144,25 @@ unimachR <-function(ids,del_data,hgnc.table){
       acc_url = paste0("https://www.uniprot.org/uniprot/",id,".fasta")
       
       # scrape uniprot web server
-      temp = str_split(colnames(fread(acc_url)), "GN=")
+      temp = fread(acc_url)
       
-      temp2 = str_split(unlist(temp)[2], " ")
+      ## only parse and add to table if not empty, some deleted IDs seem to be escaping
+      ## or if not using the most up to date deleted IDs table
       
-      name = unlist(temp2)[1]
-      
-      temp =
-        tibble(name=name,
-               id=id)
-      
-      mapped_ids %<>% rbind.data.frame(temp)
+      if(length(temp)>0){
+        
+        temp = str_split(colnames(temp), "GN=")
+        
+        temp2 = str_split(unlist(temp)[2], " ")
+        
+        name = unlist(temp2)[1]
+        
+        temp =
+          tibble(name=name,
+                 id=id)
+        
+        mapped_ids %<>% rbind.data.frame(temp)
+      }
       
     }
     
