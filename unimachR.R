@@ -10,10 +10,10 @@ unimachR <-function(ids,del_data,hgnc.table){
   ## columns are 1) hgnc_symbol 2) uniprot_id
   ## use this df for later matching uniprot IDs to gene symbols
   
-  
   ## [[2]] a df containing all the uniprot IDs that match to more than one gene symbol
   
   ## [[3]] a df containing all the gene symbols that match to more than one uniprot ID
+  
   
   require(tidyverse)
   require(magrittr)
@@ -80,7 +80,15 @@ unimachR <-function(ids,del_data,hgnc.table){
   cat("Biomart found",matched,"ids (",perc_matched,"%)\n")
   cat("Could not map ",no_matched,"ids (",perc_nomatched,"%)\n")
   
-  if(no_matched>0){
+  
+  
+  
+  if(no_matched==0){
+    
+    mapping_out = mapping
+    
+  } else if (no_matched>0){
+    
     
     ##### matching stage 2 #####
     ## scraping uniprot webserver
@@ -159,6 +167,8 @@ unimachR <-function(ids,del_data,hgnc.table){
     colnames(mapped_ids) = colnames(mapping)
     mapping_out = rbind.data.frame(mapping,mapped_ids)
     
+  }
+    
     ## report total mapping stats
     total_mapped = length(unique(mapping_out$uniprot_id))
     total_genes = length(unique(mapping_out$hgnc_symbol))
@@ -192,10 +202,4 @@ unimachR <-function(ids,del_data,hgnc.table){
     
     return(mapping_out_list)
     
-    
-    
-  } else {
-    return(mapping_out_list)
-  }
-
 }
