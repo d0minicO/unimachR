@@ -1,11 +1,14 @@
 ## now  then match to gene names in stages
-unimachR <-function(ids,del_data,hgnc.table){
+unimachR <-function(ids,hgnc.table){
   ## function that takes a character vector of uniprot ids (ids=ids)
-  ## and a data table of uniprot deleted IDs (del_data=del_data) # downloaded October 2022 https://www.uniprot.org/help/deleted_accessions, can download the table from here https://1drv.ms/u/s!Ah6q8jTg5ESfhIwOE5xGkTNdUVvhDw?e=cIYFmw
   ## and a table of hgnc compliant gene mappings (hgnc.table) # # downloaded April 2022 https://github.com/waldronlab/HGNChelper/blob/master/data/hgnc.table.rda, can download use table from dowens github
+
+  ## note, the deleted uniprot IDs database is not necessary now after tweaking code.
+  ## when scraping uniprot IDs, empty entries will not cause error and will just be saved into a new output df so they can be checked against the deleted IDs database later, if desired
+  ## but most likely, if they are not listed on uniprot anymore, then you dont need them!
+  ## this was done as loading the deleted uniprot IDs takes A LONG TIME and will sometimes die due to memory allocation failures
   
-  
-  ## and will return a list containing three df elements
+  ## and will return a list containing four df elements
   ## [[1]] a df with each uniprot ID as a row with a matched HGNC-compliant gene symbol
   ## columns are 1) hgnc_symbol 2) uniprot_id
   ## use this df for later matching uniprot IDs to gene symbols
@@ -13,6 +16,9 @@ unimachR <-function(ids,del_data,hgnc.table){
   ## [[2]] a df containing all the uniprot IDs that match to more than one gene symbol
   
   ## [[3]] a df containing all the gene symbols that match to more than one uniprot ID
+  
+  ## NEW
+  ## [[4]] a df containing all the uniprot IDs that were not found on uniprot (likely deleted /demerged IDs)
   
   
   require(tidyverse)
@@ -93,43 +99,23 @@ unimachR <-function(ids,del_data,hgnc.table){
     ##### matching stage 2 #####
     ## scraping uniprot webserver
     cat("\n\n\n##### matching stage 2 #####\n")
-    #cat("\nsearching for deleted uniprot ids\n")
-    
+
     
     ## have XX uniprot IDs not mapped to genes, attemp to look these up on uniprot web and recover gene name
     missed_ids = ids[ids %notin% mapping$uniprot_id]
     
-    ## optional to clean them up to remove uniprot deleted IDs otherwise the loop no bueno
-    #cat("loading deleted huge deleted IDs table, takes some time...\n")
-    #del_accs = readRDS(del_data)
-    #cat("Done!\n")
-    
-    # set keys to help join faster
-    #setkey(del_accs, "id")
-    
     # make the ids table into a data table to allow quick join to the deleted IDs
-    #missed_ids %<>% data.table()
+    missed_ids %<>% data.table()
     
     colnames(missed_ids) = "uniprot_id"
-    
-    # set the key
-    #setkey(missed_ids,"uniprot_id")
-    
-    #deleted = makeChar(missed_ids[del_accs, nomatch = 0])
-    
-    #cat("found",length(deleted),"deleted uniprot ID, removing\n")
-    
-    # remove any deleted IDs
-    #missed_ids %<>% 
-    #  filter(uniprot_id %notin% deleted)
-    
-    
+
     ids_toScrape = makeChar(missed_ids$uniprot_id)
     cat("scraping uniprot server searching for",length(ids_toScrape),"ids\n")
     
     
     id = ids_toScrape[1]
     mapped_ids = tibble()
+    del_ids = tibble()
     for(i in 1:length(ids_toScrape)){
       
       # reset temp to null
@@ -162,16 +148,21 @@ unimachR <-function(ids,del_data,hgnc.table){
                  id=id)
         
         mapped_ids %<>% rbind.data.frame(temp)
+      } else {
+        temp_df =
+          tibble(
+            id
+          )
+        del_ids %<>% rbind.data.frame(temp_df)
       }
       
     }
     
-    cat("scraping done for",nrow(mapped_ids),"ids\n")
+    cat("\nscraping done for",nrow(mapped_ids),"ids\n")
     
     ## remove any that have no gene name on uniprot
     mapped_ids %<>%
       filter(!is.na(name))
-    
     
     ## combine the scraped ids and biomart matched ids
     colnames(mapped_ids) = colnames(mapping)
@@ -186,7 +177,7 @@ unimachR <-function(ids,del_data,hgnc.table){
     
     perc_matched = signif(total_mapped*100/total_in,4)
     
-    cat("unimachR mapped",total_mapped,"ids out of",total_in,"(",perc_matched,"%)\n")
+    cat("\n\n\nunimachR mapped",total_mapped,"ids out of",total_in,"(",perc_matched,"%)\n")
     cat(total_mapped,"ids mapped to",total_genes,"HGNC symbols\n")
     
     
@@ -207,7 +198,7 @@ unimachR <-function(ids,del_data,hgnc.table){
     
     ## compose a list as output
     mapping_out_list =
-      list(mapping_out,multi_ids,multi_genes)
+      list(mapping_out,multi_ids,multi_genes,del_ids)
     
     
     return(mapping_out_list)
