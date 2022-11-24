@@ -80,115 +80,122 @@ unimachR <-function(ids,del_data,hgnc.table){
   cat("Biomart found",matched,"ids (",perc_matched,"%)\n")
   cat("Could not map ",no_matched,"ids (",perc_nomatched,"%)\n")
   
-  
-  ##### matching stage 2 #####
-  ## scraping uniprot webserver
-  cat("##### matching stage 2 #####\n")
-  cat("searching for deleted uniprot ids\n")
-  
-  
-  ## have XX uniprot IDs not mapped to genes, attemp to look these up on uniprot web and recover gene name
-  missed_ids = ids[ids %notin% mapping$uniprot_id]
-  
-  ## first need to clean them up to remove uniprot deleted IDs otherwise the loop no bueno
-  cat("loading deleted huge deleted IDs table, takes some time...\n")
-  del_accs = readRDS(del_data)
-  cat("Done!\n")
-  
-  # set keys to help join faster
-  setkey(del_accs, "id")
-  
-  # make the ids table into a data table to allow quick join to the deleted IDs
-  missed_ids %<>% data.table()
-  
-  colnames(missed_ids) = "uniprot_id"
-  
-  # set the key
-  setkey(missed_ids,"uniprot_id")
-  
-  deleted = makeChar(missed_ids[del_accs, nomatch = 0])
-  
-  cat("found",length(deleted),"deleted uniprot ID, removing\n")
-  
-  # remove any deleted IDs
-  missed_ids %<>% 
-    filter(uniprot_id %notin% deleted)
-  
-  
-  ids_toScrape = makeChar(missed_ids$uniprot_id)
-  cat("scraping uniprot server searching for",length(ids_toScrape),"ids\n")
-  
-  
-  id = ids_toScrape[1]
-  mapped_ids = tibble()
-  for(i in 1:length(ids_toScrape)){
+  if(no_matched>0){
+    
+    ##### matching stage 2 #####
+    ## scraping uniprot webserver
+    cat("##### matching stage 2 #####\n")
+    cat("searching for deleted uniprot ids\n")
     
     
-    id = ids_toScrape[i]
+    ## have XX uniprot IDs not mapped to genes, attemp to look these up on uniprot web and recover gene name
+    missed_ids = ids[ids %notin% mapping$uniprot_id]
     
-    # report progress
-    a = signif(i*100/length(ids_toScrape),2)
-    cat(id,a,"% \n")
-    ## error here is likely caused by deleted ID
-    acc_url = paste0("https://www.uniprot.org/uniprot/",id,".fasta")
+    ## first need to clean them up to remove uniprot deleted IDs otherwise the loop no bueno
+    cat("loading deleted huge deleted IDs table, takes some time...\n")
+    del_accs = readRDS(del_data)
+    cat("Done!\n")
     
-    # scrape uniprot web server
-    temp = str_split(colnames(fread(acc_url)), "GN=")
+    # set keys to help join faster
+    setkey(del_accs, "id")
     
-    temp2 = str_split(unlist(temp)[2], " ")
+    # make the ids table into a data table to allow quick join to the deleted IDs
+    missed_ids %<>% data.table()
     
-    name = unlist(temp2)[1]
+    colnames(missed_ids) = "uniprot_id"
     
-    temp =
-      tibble(name=name,
-             id=id)
+    # set the key
+    setkey(missed_ids,"uniprot_id")
     
-    mapped_ids %<>% rbind.data.frame(temp)
+    deleted = makeChar(missed_ids[del_accs, nomatch = 0])
     
+    cat("found",length(deleted),"deleted uniprot ID, removing\n")
+    
+    # remove any deleted IDs
+    missed_ids %<>% 
+      filter(uniprot_id %notin% deleted)
+    
+    
+    ids_toScrape = makeChar(missed_ids$uniprot_id)
+    cat("scraping uniprot server searching for",length(ids_toScrape),"ids\n")
+    
+    
+    id = ids_toScrape[1]
+    mapped_ids = tibble()
+    for(i in 1:length(ids_toScrape)){
+      
+      
+      id = ids_toScrape[i]
+      
+      # report progress
+      a = signif(i*100/length(ids_toScrape),2)
+      cat(id,a,"% \n")
+      ## error here is likely caused by deleted ID
+      acc_url = paste0("https://www.uniprot.org/uniprot/",id,".fasta")
+      
+      # scrape uniprot web server
+      temp = str_split(colnames(fread(acc_url)), "GN=")
+      
+      temp2 = str_split(unlist(temp)[2], " ")
+      
+      name = unlist(temp2)[1]
+      
+      temp =
+        tibble(name=name,
+               id=id)
+      
+      mapped_ids %<>% rbind.data.frame(temp)
+      
+    }
+    
+    cat("scraping done for",nrow(mapped_ids),"ids\n")
+    
+    ## remove any that have no gene name on uniprot
+    mapped_ids %<>%
+      filter(!is.na(name))
+    
+    
+    ## combine the scraped ids and biomart matched ids
+    colnames(mapped_ids) = colnames(mapping)
+    mapping_out = rbind.data.frame(mapping,mapped_ids)
+    
+    ## report total mapping stats
+    total_mapped = length(unique(mapping_out$uniprot_id))
+    total_genes = length(unique(mapping_out$hgnc_symbol))
+    total_in = length(ids)
+    
+    perc_matched = signif(total_mapped*100/total_in,4)
+    
+    cat("unimachR mapped",total_mapped,"ids out of",total_in,"(",perc_matched,"%)\n")
+    cat(total_mapped,"ids mapped to",total_genes,"HGNC symbols\n")
+    
+    
+    ## find the uniprot IDs that map to more than one gene name
+    multi_ids =
+      mapping_out %>%
+      group_by(uniprot_id) %>%
+      summarise(count=n()) %>%
+      filter(count >1) %>%
+      arrange(desc(count))
+    
+    multi_genes =
+      mapping_out %>%
+      group_by(hgnc_symbol) %>%
+      summarise(count=n()) %>%
+      filter(count >1) %>%
+      arrange(desc(count))
+    
+    ## compose a list as output
+    mapping_out_list =
+      list(mapping_out,multi_ids,multi_genes)
+    
+    
+    return(mapping_out_list)
+    
+    
+    
+  } else {
+    return(mapping_out_list)
   }
-  
-  cat("scraping done for",nrow(mapped_ids),"ids\n")
-  
-  ## remove any that have no gene name on uniprot
-  mapped_ids %<>%
-    filter(!is.na(name))
-  
-  
-  ## combine the scraped ids and biomart matched ids
-  colnames(mapped_ids) = colnames(mapping)
-  mapping_out = rbind.data.frame(mapping,mapped_ids)
-  
-  ## report total mapping stats
-  total_mapped = length(unique(mapping_out$uniprot_id))
-  total_genes = length(unique(mapping_out$hgnc_symbol))
-  total_in = length(ids)
-  
-  perc_matched = signif(total_mapped*100/total_in,4)
-  
-  cat("unimachR mapped",total_mapped,"ids out of",total_in,"(",perc_matched,"%)\n")
-  cat(total_mapped,"ids mapped to",total_genes,"HGNC symbols\n")
-  
-  
-  ## find the uniprot IDs that map to more than one gene name
-  multi_ids =
-    mapping_out %>%
-    group_by(uniprot_id) %>%
-    summarise(count=n()) %>%
-    filter(count >1) %>%
-    arrange(desc(count))
-  
-  multi_genes =
-    mapping_out %>%
-    group_by(hgnc_symbol) %>%
-    summarise(count=n()) %>%
-    filter(count >1) %>%
-    arrange(desc(count))
-  
-  ## compose a list as output
-  mapping_out_list =
-    list(mapping_out,multi_ids,multi_genes)
-  
-  
-  return(mapping_out_list)
-  
+
 }
