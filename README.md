@@ -3,7 +3,7 @@
 
 
 Takes a character vector of uniprot ids (ids=ids)
-and a table of hgnc compliant gene mappings (hgnc.table) # # downloaded April 2022 https://github.com/waldronlab/HGNChelper/blob/master/data/hgnc.table.rda, can download use table from dowens github
+and a table of hgnc compliant gene mappings (hgnc.table) # # downloaded April 2022 https://github.com/waldronlab/HGNChelper/blob/master/data/hgnc.table.rda
 
 Note, the deleted uniprot IDs database is not necessary now after tweaking code.
 when scraping uniprot IDs, empty entries will not cause error and will just be saved into a new output df so they can be checked against the deleted IDs database later, if desired
